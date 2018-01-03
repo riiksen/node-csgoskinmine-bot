@@ -1,0 +1,10 @@
+{
+	"0x00" : "No error occurred",
+	"0x01": "Invalid token",
+	"0x02": "I was unable to find the requested item in my inventory",
+	"0x02": "Can't find requested item in bot inventory",
+	"0x03": "User don't have enought money to withdraw",
+	"0x04": "Can't obtain bot inventory contents",
+	"0x05": "Error occurred while sending offer",
+	"0x06": "Error occurred during mysql query"
+}
