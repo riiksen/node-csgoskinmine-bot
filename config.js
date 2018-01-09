@@ -1,6 +1,9 @@
 module.exports = {
 	token: '', //Token to authenticate withdraw request's
 	apiKey: '', //Steam api key
+	doamin: 'csgoskinmine.com', //Your domain
+	cancelTime: '600000', //Time after which offer will be automaticly canceld, default: 10 minutes
+	valueMultiplier: '100000', //
 
 	bot: {
 		name: '', //Steam account name

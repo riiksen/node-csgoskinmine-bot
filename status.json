@@ -6,5 +6,6 @@
 	"0x03": "User don't have enought money to withdraw",
 	"0x04": "Can't obtain bot inventory contents",
 	"0x05": "Error occurred while sending offer",
-	"0x06": "Error occurred during mysql query"
+	"0x06": "Error occurred during mysql query",
+	"0x07": "Requested item is already in trade"
 }
