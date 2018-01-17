@@ -7,3 +7,5 @@ A bot for steam withdraw's and other stuff (in a future xD)
 	* Add more bugs to remove later
 	* Optimize a hole script
 	* Log a json informations instead of normal text
+	* Make a phpsessid parsing or something
+	* More loggz
