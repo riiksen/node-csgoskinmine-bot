@@ -47,7 +47,7 @@ client.on('webSession', function(sessionID, cookies){
 		webCookie: cookies
 	});
 
-	mobileConfirm();
+	//mobileConfirm(); //I don't think that this is needed
 	
 	manager.setCookies(cookies, function(err){
 		if(err) {
@@ -145,7 +145,7 @@ manager.on('sentOfferCanceled', function(offer, reason){
 				});
 			});
 		}
-	})
+	});
 });
 
 function log(text){
@@ -163,7 +163,7 @@ function reAuth(){
 }
 
 function mobileConfirm(){
-	steamConfirmations.FetchConfirmations(function (err, confirmations){
+	steamConfirmations.fetchConfirmations(function(err, confirmations){
 		if (err){
 			log(err);
 			return;
@@ -172,7 +172,7 @@ function mobileConfirm(){
 			return;
 		}
 		confirmations.forEach(function(confirmation) {
-			steamConfirmations.AcceptConfirmation(confirmation, (function (err, result){
+			steamConfirmations.acceptConfirmation(confirmation, (function (err, result){
 				if (err){
 					log(err);
 					return;
@@ -274,13 +274,21 @@ function getItemsInTrade(){
 	return itemsInTrade;
 }
 
+function getBotsAccountsIds(){
+	return client.steamid.getSteamID64();
+}
+
 app.post('/withdraw', function(req, res){
 	res.send(sendoffer(req.body));
 });
 
 app.get('/getItemsInTrade', function(req, res){
 	res.send(getItemsInTrade());
-})
+});
+
+app.get('/getBotsAccountsIds', function(req, res){
+	res.send(getBotsAccountsIds());
+});
 
 updatePrice();
 setInterval(updatePrice, 600000);
