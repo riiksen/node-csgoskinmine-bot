@@ -10,7 +10,7 @@ $(document).ready(function() {
     type: "GET",
     dataType: "json",
     success: function(data) {
-      v1 = v0 = data;
+      v0 = data;
     },
     error: function(xhr, error, status) {
       Materialize.toast("An error occuried when trying to fetch bot items", 4000);
