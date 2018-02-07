@@ -6,7 +6,7 @@ $(document).ready(function() {
   var v4;
 
   $.ajax({
-    url: "http://steamcommunity.com/profiles/CerteX-Play/inventory/json/730/2",
+    url: "http://steamcommunity.com/id/CerteX-Play/inventory/json/730/2",
     type: "GET",
     dataType: "json",
     success: function(data) {
