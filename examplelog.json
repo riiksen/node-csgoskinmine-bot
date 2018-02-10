@@ -1,0 +1,7 @@
+[
+  {"time": 1549841654, "errlevel": "info", "code": "0x00", "message": "No error occurred"},
+  {"time": 1549841654, "errlevel": "warning", "code": "", "message": ""},
+  {"time": 1549841654, "errlevel": "error", "code": "", "message": ""},
+  {"time": 1549841654, "errlevel": "debug", "code": "", "message": ""},
+  {"time": 1549841654, "errlevel": "panic", "code": "", "message": ""},
+]

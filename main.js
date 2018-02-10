@@ -12,15 +12,15 @@ var prices = null;
 var activeOffers = [];
 var con = mysql.createConnection(config.mysql);
 
-con.connect(function(err){
-  if(err) throw err;
+con.connect(function(err) {
+  if (err) throw err;
 });
 
 const app = express();
 
 var client = new SteamUser();
 
-var manager = new TradeOfferManager({
+var manager = new TradeOfferManager( {
   "steam": client,
   "domain": config.domain,
   "language": "en",
@@ -29,17 +29,17 @@ var manager = new TradeOfferManager({
 
 manager.apiKey = config.apiKey;
 
-client.logOn({
+client.logOn( {
   "accountName": config.bot.name,
   "password": config.bot.password,
   "twoFactorCode": SteamTotp.generateAuthCode(config.bot.shared_secret)
 });
 
-client.on('loggedOn', function(){
+client.on('loggedOn', function() {
   client.setPersona(SteamUser.Steam.EPersonaState.Online);
 });
 
-client.on('webSession', function(sessionID, cookies){
+client.on('webSession', function(sessionID, cookies) {
   
   steamConfirmations = new SteamMobileConfirmations({
     steamid: client.steamID,
@@ -47,7 +47,7 @@ client.on('webSession', function(sessionID, cookies){
     webCookie: cookies
   });
 
-  //mobileConfirm(); //I don't think that this is needed
+  //mobileConfirm(); //I think that this is not needed
   
   manager.setCookies(cookies, function(err){
     if(err) {
@@ -74,34 +74,34 @@ manager.on('newOffer', function(offer){
 });
 
 manager.on('realTimeTradeCompleted', function(offer){
-  activeOffers.some(function(element, index, array){ //Using some instead of forEach for performance
-    if(element.id === offer.id){
-      activeOffers.splice(index, 1);
-      return true;
+  for (var i in activeOffers) {
+    if (activeOffers[i].id === offer.id) {
+      activeOffers.splice(i, 1);
+      break;
     } else {
-      return false;
+      continue;
     }
-  });
-  con.query("UPDATE withdraws SET state = 'complete' WHERE tradeid = " + offer.id, function(err, result){
-    if(err) log(err);
+  }
+  con.query("UPDATE withdraws SET state = 'complete' WHERE tradeid = " + offer.id, function(err, result) {
+    if (err) log(err);
     else log("offer: " + offer.id + " Updated state to complete");
   });
 });
 
 manager.on('sentOfferChanged', function(offer, oldState){
-  activeOffers.some(function(element, index, array){
-    if(element.id === offer.id){
-      activeOffers.splice(index, 1);
-      return true;
+  for (var i in activeOffers) {
+    if (activeOffers[i].id === offer.id) {
+      activeOffers.splice(i, 1);
+      break;
     } else {
-      return false;
+      continue;
     }
-  });
+  }
   offer.decline(function(err){
     if(err) log(err);
     else log();
   });
-  con.query("SELECT value FROM withdraws WHERE tradeid = '"+offer.id+"'", function(err, result, fields){
+  con.query("SELECT value FROM withdraws WHERE tradeid = '" + offer.id+"'", function(err, result, fields){
     if(err) log(err);
     else {
       con.query("SELECT coins FROM users WHERE steamid = "+offer.partner, function(err2, result2, fields2){
@@ -123,23 +123,23 @@ manager.on('sentOfferChanged', function(offer, oldState){
 });
 
 
-manager.on('sentOfferCanceled', function(offer, reason){
-  activeOffers.some(function(element, index, array){
-    if(element.id === offer.id){
-      activeOffers.splice(index, 1);
-      return true;
+manager.on('sentOfferCanceled', function(offer, reason) {
+  for (var i in activeOffers) {
+    if (activeOffers[i].id === offer.id) {
+      activeOffers.splice(i, 1);
+      break;
     } else {
-      return false;
+      continue;
     }
-  });
-  con.query("SELECT value FROM withdraws WHERE tradeid = '"+offer.id+"'", function(err, result, fields){
-    if(err) log(err);
+  }
+  con.query("SELECT value FROM withdraws WHERE tradeid = '" + offer.id + "'", function(err, result, fields) {
+    if (err) log(err);
     else {
-      con.query("SELECT coins FROM users WHERE steamid = "+offer.partner, function(err2, result2, fields2){
-        con.query("UPDATE users SET coins = "+ result[0].coins+result2[0].coins+" WHERE steamid = "+offer.partner, function(err, result){
-          if(err) log(err);
-          else log("offer: "+offer.id+" canceled, returned coins to user");
-          con.query("UPDATE withdraws SET state = 'canceled' WHERE tradeid = " + offer.id, function(err, result){
+      con.query("SELECT coins FROM users WHERE steamid = " + offer.partner, function(err2, result2, fields2) {
+        con.query("UPDATE users SET coins = " + result[0].coins + result2[0].coins + " WHERE steamid = " + offer.partner, function(err, result) {
+          if (err) log(err);
+          else log("offer: " + offer.id + " canceled, returned coins to user");
+          con.query("UPDATE withdraws SET state = 'canceled' WHERE tradeid = " + offer.id, function(err, result) {
             if(err) log(err);
           });
         });
@@ -148,11 +148,24 @@ manager.on('sentOfferCanceled', function(offer, reason){
   });
 });
 
-function log(text){
+function log(text) {
   fs.appendFile('log.txt', Date.now() + text);
 }
 
-function reAuth(){
+function log(file, message, code, errlevel = "info", arg1 = "nope", arg2 = "nope", arg3 = "nope") {
+  var toLog = {
+    "time": Date.now(),
+    "errlevel": errlevel,
+    "code": code,
+    "message": message,
+    "arg1": arg1,
+    "arg2": arg2,
+    "arg3": arg3
+  };
+  fs.appendFile(file, JSON.stringify(toLog));
+}
+
+function reAuth() {
   client.logOff();
   client.logOn({
     "accountName": config.bot.name,
@@ -171,21 +184,21 @@ function mobileConfirm(){
     if (!confirmations.length){
       return;
     }
-    confirmations.forEach(function(confirmation) {
-      steamConfirmations.acceptConfirmation(confirmation, (function (err, result){
-        if (err){
+    for (var i in confirmations) {
+      steamConfirmations.acceptConfirmation(confirmations[i], function(err, result) {
+        if (err) {
           log(err);
           return;
         }
-        log('Mobile Confirmation: ' + result);
-      }));
-    });
+        log("Mobile Confirmation: " + result);
+      });
+    }
   });
 }
 
-function updatePrice(fr){
-  request('http://api.csgofast.com/price/all', {json:true}, function(err, res, body){
-    if(err){
+function updatePrice(fr) {
+  request('http://api.csgofast.com/price/all', {json:true}, function(err, res, body) {
+    if (err) {
       log(err);
       return;
     }
@@ -193,26 +206,26 @@ function updatePrice(fr){
   });
 }
 
-function getPrice(item){
+function getPrice(item) {
   return prices[item.market_hash_name];
 }
 
-function sendoffer(json){
+function sendoffer(json) {
   var json = JSON.parse(json);
   var ce = null; //Callback error
   var value = 0;
   if (json.token !== config.token) return "0x01";
 
   const offer = this.manager.createOffer(json.partner);
-  manager.getInventoryContents(730, 2, false, function(err, items, currencies){
-    if(err) {
+  manager.getInventoryContents(730, 2, false, function(err, items, currencies) {
+    if (err) {
       reAuth();
       ce = "0x04";
       return;
     }
     for (var i = 0; i < json.items.length; i++) {
       var item = inv.find(item => item.assetid === json.items[i].assetid);
-      if(item) {
+      if (item) {
         value += getPrice(item.market_hash_name);
         offer.addMyItem(item);
       } else {
@@ -221,14 +234,14 @@ function sendoffer(json){
       }
     }
 
-    con.query("SELECT coins FROM users WHERE steamid = "+offer.partner+"AND coins >= "+value * 100000, function(err, result, fields){
-      if(err){
+    con.query("SELECT coins FROM users WHERE steamid = " + offer.partner + "AND coins >= " + value * 100000, function(err, result, fields) {
+      if (err) {
         ce = 0x06;
         return;
       }
-      if(result.length === 1){
-        offer.send(function(err, status){
-          if(err){
+      if (result.length === 1) {
+        offer.send(function(err, status) {
+          if (err) {
             ce = "0x05";
             return;
           }
@@ -240,24 +253,24 @@ function sendoffer(json){
             ce = "0x08";
           }
           if (ce != null) return;
-          con.query("INSERT INTO withdraws (staemid, tradeid, coins, state) VALUES ("+offer.partner+','+offer.id+','+value*100000+", 'pending')", function(err, result){
-            if(err){
+          con.query("INSERT INTO withdraws (staemid, tradeid, coins, state) VALUES (" + offer.partner + ',' + offer.id + ',' + value * 100000 + ", 'pending')", function(err, result) {
+            if (err) {
               ce = "0x06";
               return;
             } else {
               log("offer sent: "+offer.id);
             }
           });
-          if(ce != null) return;
-          con.query("UPDATE users SET coins = "+result[0].coins-value*100000+"WHERE steamid = "+offer.partner, function(err, result){
-            if(err){
+          if (ce != null) return;
+          con.query("UPDATE users SET coins = " + result[0].coins - value * 100000 + "WHERE steamid = " + offer.partner, function(err, result) {
+            if (err) {
               ce = "0x06";
               return;
             } else {
-              log("Updated user: "+offer.partner+" Coins");
+              log("Updated user: " + offer.partner + " Coins");
             }
           });
-          if(ce != null) return;
+          if (ce != null) return;
           else {
             ce = "0x00";
             activeOffers.push(offer);
@@ -271,29 +284,29 @@ function sendoffer(json){
   return cr;
 }
 
-function getItemsInTrade(){
+function getItemsInTrade() {
   var itemsInTrade = [];
-  activeOffers.forEach(function(offer){
-    offer.itemsToGive.forEach(function(items){
-      itemsInTrade.push(item.assetid);
-    });
-  });
+  for (var i in activeOffers) {
+    for (var n in activeOffers[i].itemsToGive) {
+      itemsInTrade.push(activeOffers[i].itemsToGive[n].assetid);
+    }
+  }
   return itemsInTrade;
 }
 
-function getBotsAccountsIds(){
-  return client.steamid.getSteamID64();
+function getBotsAccountsIds() {
+  return client.steamID.getSteamID64();
 }
 
-app.post('/withdraw', function(req, res){
+app.post('/withdraw', function(req, res) {
   res.send(sendoffer(req.body));
 });
 
-app.get('/getItemsInTrade', function(req, res){
+app.get('/getItemsInTrade', function(req, res) {
   res.send(getItemsInTrade());
 });
 
-app.get('/getBotsAccountsIds', function(req, res){
+app.get('/getBotsAccountsIds', function(req, res) {
   res.send(getBotsAccountsIds());
 });
 

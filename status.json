@@ -1,4 +1,6 @@
 {
+  //Info errors -- Just a informations
+  //Request returns 
   "0x00" : "No error occurred",
   "0x01": "Invalid token",
   "0x02": "I was unable to find the requested item in my inventory",
@@ -8,5 +10,23 @@
   "0x05": "Error occurred while sending offer",
   "0x06": "Error occurred during mysql query",
   "0x07": "Requested item is already in trade",
-  "0x08": "Offer is in escrow"
+  "0x08": "Offer is in escrow",
+
+  //Warnings -- Errors that can be handled by a script
+
+  //Panic errors -- Errors that needs you to handle this
+
+  "0x00": {
+    "errlevel": "info",
+    "desc": "No error occurred",
+  },
+  "0x01": {
+    "errlevel": "warning",
+    "desc": "Invalid token",
+  },
+  "0x02": {
+    "errlevel": "warning",
+    "desc": "Can't find requested item in bot inventory"
+  }
+
 }

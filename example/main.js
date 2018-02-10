@@ -6,11 +6,11 @@ $(document).ready(function() {
   var v4;
 
   $.ajax({
-    url: "http://steamcommunity.com/id/CerteX-Play/inventory/json/730/2",
+    url: "https://steamcommunity.com/id/CerteX-Play/inventory/json/730/2",
     type: "GET",
     dataType: "json",
     success: function(data) {
-      v0 = data;
+      v0 = JSON.parse(data);
     },
     error: function(xhr, error, status) {
       Materialize.toast("An error occuried when trying to fetch bot items", 4000);
@@ -47,7 +47,7 @@ $(document).ready(function() {
 
   if (v4 !== null) {
     for (var i in v0["rgInventory"]) {
-      for (var n in v4){
+      for (var n in v4) {
         if (v0["rgInventory"][i]["id"] == v4[n]) {
           v0["rgInventory"][i] = undefined;
         }
@@ -56,7 +56,9 @@ $(document).ready(function() {
   }
 
   for (var i in v0["rgInventory"]) {
-    $("#v").append("<div name=\"" + v0["rgDescriptions"][v0["rgInventory"][i]["classid"] + "_" + v0["rgInventory"][i]["instanceid"]]["market_hash_name"] + "\">")
+    $("#v").append("<div name=\"" +
+      v0["rgDescriptions"][v0["rgInventory"][i]["classid"] + "_" +
+      v0["rgInventory"][i]["instanceid"]]["market_hash_name"] + "\">");
     if (v0["rgInventory"][i]["instanceid"] == 0) {
       v1 = v0["rgDescriptions"][v0["rgInventory"][i]["classid"] + "_" + v0["rgInventory"][i]["instanceid"]];
       $("#v").append("<img src=\"https://steamcommunity-a.akamaihd.net/economy/image/" +
