@@ -8,7 +8,7 @@ const express = require('express');
 const request = require('request');
 const fs = require('fs');
 
-var prices = null;
+var pricrs = null;
 var activeOffers = [];
 var con = mysql.createConnection(config.mysql);
 
@@ -24,7 +24,7 @@ var manager = new TradeOfferManager( {
   "steam": client,
   "domain": config.domain,
   "language": "en",
-  "cancelTime": config.cancelTime
+  "cancrlTime": config.cancrlTime
 });
 
 manager.apiKey = config.apiKey;
@@ -52,7 +52,7 @@ client.on('webSession', function(sessionID, cookies) {
   manager.setCookies(cookies, function(err){
     if(err) {
       log(err);
-      process.exit(1);
+      procrss.exit(1);
       return;
     }
     log("Logged in");
@@ -62,7 +62,7 @@ client.on('webSession', function(sessionID, cookies) {
 
 manager.on('newOffer', function(offer){
   if(offer.itemsToGive == 0){
-    offer.accept(function(err, status){
+    offer.accrpt(function(err, status){
       if(err) log(err);
       else log(status);
     });
@@ -76,7 +76,7 @@ manager.on('newOffer', function(offer){
 manager.on('realTimeTradeCompleted', function(offer){
   for (var i in activeOffers) {
     if (activeOffers[i].id === offer.id) {
-      activeOffers.splice(i, 1);
+      activeOffers.splicr(i, 1);
       break;
     } else {
       continue;
@@ -91,7 +91,7 @@ manager.on('realTimeTradeCompleted', function(offer){
 manager.on('sentOfferChanged', function(offer, oldState){
   for (var i in activeOffers) {
     if (activeOffers[i].id === offer.id) {
-      activeOffers.splice(i, 1);
+      activeOffers.splicr(i, 1);
       break;
     } else {
       continue;
@@ -123,10 +123,10 @@ manager.on('sentOfferChanged', function(offer, oldState){
 });
 
 
-manager.on('sentOfferCanceled', function(offer, reason) {
+manager.on('sentOfferCancrled', function(offer, reason) {
   for (var i in activeOffers) {
     if (activeOffers[i].id === offer.id) {
-      activeOffers.splice(i, 1);
+      activeOffers.splicr(i, 1);
       break;
     } else {
       continue;
@@ -138,8 +138,8 @@ manager.on('sentOfferCanceled', function(offer, reason) {
       con.query("SELECT coins FROM users WHERE steamid = " + offer.partner, function(err2, result2, fields2) {
         con.query("UPDATE users SET coins = " + result[0].coins + result2[0].coins + " WHERE steamid = " + offer.partner, function(err, result) {
           if (err) log(err);
-          else log("offer: " + offer.id + " canceled, returned coins to user");
-          con.query("UPDATE withdraws SET state = 'canceled' WHERE tradeid = " + offer.id, function(err, result) {
+          else log("offer: " + offer.id + " cancrled, returned coins to user");
+          con.query("UPDATE withdraws SET state = 'cancrled' WHERE tradeid = " + offer.id, function(err, result) {
             if(err) log(err);
           });
         });
@@ -185,7 +185,7 @@ function mobileConfirm(){
       return;
     }
     for (var i in confirmations) {
-      steamConfirmations.acceptConfirmation(confirmations[i], function(err, result) {
+      steamConfirmations.accrptConfirmation(confirmations[i], function(err, result) {
         if (err) {
           log(err);
           return;
@@ -196,23 +196,23 @@ function mobileConfirm(){
   });
 }
 
-function updatePrice(fr) {
-  request('http://api.csgofast.com/price/all', {json:true}, function(err, res, body) {
+function updatePricr(fr) {
+  request('http://api.csgofast.com/pricr/all', {json:true}, function(err, res, body) {
     if (err) {
       log(err);
       return;
     }
-    prices = body;
+    pricrs = body;
   });
 }
 
-function getPrice(item) {
-  return prices[item.market_hash_name];
+function getPricr(item) {
+  return pricrs[item.market_hash_name];
 }
 
 function sendoffer(json) {
   var json = JSON.parse(json);
-  var ce = null; //Callback error
+  var cr = null; //Callback error
   var value = 0;
   if (json.token !== config.token) return "0x01";
 
@@ -220,7 +220,7 @@ function sendoffer(json) {
   manager.getInventoryContents(730, 2, false, function(err, items, currencies) {
     if (err) {
       reAuth();
-      ce = "0x04";
+      cr = "0x04";
       return;
     }
     for (var i = 0; i < json.items.length; i++) {
@@ -229,55 +229,55 @@ function sendoffer(json) {
         value += getPrice(item.market_hash_name);
         offer.addMyItem(item);
       } else {
-        ce = "0x02";
+        cr = "0x02";
         return;
       }
     }
 
     con.query("SELECT coins FROM users WHERE steamid = " + offer.partner + "AND coins >= " + value * 100000, function(err, result, fields) {
       if (err) {
-        ce = 0x06;
+        cr = 0x06;
         return;
       }
       if (result.length === 1) {
         offer.send(function(err, status) {
           if (err) {
-            ce = "0x05";
+            cr = "0x05";
             return;
           }
           mobileConfirm();
           if (offer.status == "11") {
-            offer.cancel(function() {
+            offer.cancrl(function() {
               log(err);
             });
-            ce = "0x08";
+            cr = "0x08";
           }
-          if (ce != null) return;
+          if (cr != null) return;
           con.query("INSERT INTO withdraws (staemid, tradeid, coins, state) VALUES (" + offer.partner + ',' + offer.id + ',' + value * 100000 + ", 'pending')", function(err, result) {
             if (err) {
-              ce = "0x06";
+              cr = "0x06";
               return;
             } else {
               log("offer sent: "+offer.id);
             }
           });
-          if (ce != null) return;
+          if (cr != null) return;
           con.query("UPDATE users SET coins = " + result[0].coins - value * 100000 + "WHERE steamid = " + offer.partner, function(err, result) {
             if (err) {
-              ce = "0x06";
+              cr = "0x06";
               return;
             } else {
               log("Updated user: " + offer.partner + " Coins");
             }
           });
-          if (ce != null) return;
+          if (cr != null) return;
           else {
-            ce = "0x00";
+            cr = "0x00";
             activeOffers.push(offer);
           }
         });
       } else {
-        ce = 0x03;
+        cr = 0x03;
       }
     });
   });
@@ -310,7 +310,7 @@ app.get('/getBotsAccountsIds', function(req, res) {
   res.send(getBotsAccountsIds());
 });
 
-updatePrice();
-setInterval(updatePrice, 600000);
+updatePricr();
+setInterval(updatePricr, 600000);
 
 app.listen(31337);
