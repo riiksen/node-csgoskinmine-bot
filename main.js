@@ -1,287 +1,136 @@
-const config = require('./config.js');
-const SteamUser = require('steam-user');
-const TradeOfferManager = require('steam-tradeoffer-manager');
-const SteamTotp = require('steam-totp');
-const SteamMobileConfirmations = require('steam-mobile-confirmations');
-const mysql = require('mysql');
-const express = require('express');
-const request = require('request');
-const fs = require('fs');
-
-var pricrs = null;
-var activeOffers = [];
-var con = mysql.createConnection(config.mysql);
-
-con.connect(function(err) {
-  if (err) throw err;
-});
+'use strict';
+const config = require("./config.js");
+const SteamUser = require("steam-user");
+const TradeOfferManager = require("steam-tradeoffer-manager");
+const SteamCommunity = require("steamcommunity");
+const SteamTotp = require("steam-totp");
+//const SteamMobileConfirmations = require("steam-mobile-confirmations");
+const mysql = require("mysql");
+const express = require("express");
+const request = require("request");
+const fs = require("fs");
 
 const app = express();
-
-var client = new SteamUser();
-
-var manager = new TradeOfferManager( {
-  "steam": client,
-  "domain": config.domain,
-  "language": "en",
-  "cancrlTime": config.cancrlTime
+const con = mysql.createConnection(config.mysql);
+const client = new SteamUser();
+const community = new SteamCommunity();
+const manager = new TradeOfferManager({
+  steam: client,
+  community: community,
+  //"domain": config.domain,
+  language: "en",
+  cancelTime: config.cancelTime
 });
 
-manager.apiKey = config.apiKey;
+var prices = null;
+var activeOffers = [];
+var bots = [];
 
-client.logOn( {
-  "accountName": config.bot.name,
-  "password": config.bot.password,
-  "twoFactorCode": SteamTotp.generateAuthCode(config.bot.shared_secret)
+con.connect((err) => {
+  if (err) {
+    log("ERROR", err);
+  }
 });
 
-client.on('loggedOn', function() {
+client.logOn({
+  accountName: config.bot.name,
+  password: config.password,
+  twoFactorCode: SteamTotp.generateAuthCode(config.bot.shared_secret),
+  rememberPassword: true
+});
+
+client.on("loggedOn", () => {
+  log("INFO", "Logged into steam");
   client.setPersona(SteamUser.Steam.EPersonaState.Online);
 });
 
-client.on('webSession', function(sessionID, cookies) {
-  
-  steamConfirmations = new SteamMobileConfirmations({
-    steamid: client.steamID,
-    identity_secret: config.bot.identity_secret,
-    webCookie: cookies
-  });
-
-  //mobileConfirm(); //I think that this is not needed
-  
-  manager.setCookies(cookies, function(err){
-    if(err) {
-      log(err);
-      procrss.exit(1);
-      return;
-    }
-    log("Logged in");
-  });
+client.on("webSession", (sessionid, cookies) => {
+  manager.setCookies(cookies);
+  community.setCookies(cookies);
 });
 
+//manager.apiKey = config.apiKey;
 
-manager.on('newOffer', function(offer){
-  if(offer.itemsToGive == 0){
-    offer.accrpt(function(err, status){
-      if(err) log(err);
-      else log(status);
+manager.on("newOffer", (offer) => {
+  if (offer.itemsToGive.length === 0) {
+    offer.accept((err, status) => {
+      if (err) {
+        log("ERROR", err);
+      } else {
+        log("INFO", "Donation accepted. Status: " + status);
+      }
     });
   } else {
-    offer.decline(function(err){
-      if(err) log(err);
+    offer.decline((err) => {
+      if (err) {
+        log("ERROR", err);
+      } else {
+        log("INFO", "Donation declined (wanted our items)");
+      }
     });
   }
 });
 
-manager.on('realTimeTradeCompleted', function(offer){
-  for (var i in activeOffers) {
-    if (activeOffers[i].id === offer.id) {
-      activeOffers.splicr(i, 1);
+manager.on("sentOfferChanged", (offer, oldState) => {
+  switch (offer.state) {
+    case 3: //Offer was accepted
+      for (var i in activeOffers) {
+        if (activeOffers[i].id === offer.id) {
+          activeOffers.splice(i, 1);
+          break;
+        }
+      }
+      con.query("UPDATE withdraws SET state = ? WHERE tradeid = ?", ["3", offer.id], (err, result) => {
+        if (err) {
+          log("ERROR", err);
+        } else {
+          log("INFO", "Offer: " + offer.id + "completed");
+        }
+      });
       break;
-    } else {
-      continue;
-    }
-  }
-  con.query("UPDATE withdraws SET state = 'complete' WHERE tradeid = " + offer.id, function(err, result) {
-    if (err) log(err);
-    else log("offer: " + offer.id + " Updated state to complete");
-  });
-});
-
-manager.on('sentOfferChanged', function(offer, oldState){
-  for (var i in activeOffers) {
-    if (activeOffers[i].id === offer.id) {
-      activeOffers.splicr(i, 1);
-      break;
-    } else {
-      continue;
-    }
-  }
-  offer.decline(function(err){
-    if(err) log(err);
-    else log();
-  });
-  con.query("SELECT value FROM withdraws WHERE tradeid = '" + offer.id+"'", function(err, result, fields){
-    if(err) log(err);
-    else {
-      con.query("SELECT coins FROM users WHERE steamid = "+offer.partner, function(err2, result2, fields2){
-        if(err) log(err);
-        else {
-          con.query("UPDATE users SET coins = "+result[0].value+result2[0].coins+" WHERE steamid = "+offer.partner, function(err, result){
-            if(err) log(err);
-            else {
-              log("offer: "+offer.id+"changed, returned coins to user");
-              con.query("UPDATE withdraws SET state = 'changed' WHERE tradeid = "+offer.id, function(err, result){
-                if(err) log(err);
+    case 4: //Recipent made a counter offer
+      offer.cancel();
+    case 5: //Offer is expired
+    case 6: //Offer was canceled by sender
+    case 7: //Offer was declined by recipent
+    case 8: //Offer has items that are no longer available
+    case 10: //Offer has been canceled via email/mobile confirmation
+    //case 11: //Trade has been placed on hold
+      for (var i in activeOffers) {
+        if (activeOffers[i].id === offer.id) {
+          activeOffers.splice(i, 1);
+          break;
+        } else {
+          continue;
+        }
+      }
+      log("INFO", "Offer: " + offer.id + " " + offer.status);
+      con.query("SELECT value FROM withdraws WHERE tradeid = ?", [offer.id], (err, result, fields) => {
+        if (err) {
+          log("ERROR", err);
+        } else {
+          con.query("SELECT coins FROM users WHERE steamid = ?", [offer.partner.getSteamID64()], (err, result2, fields2) => {
+            if (err) {
+              log("ERROR", err);
+            } else {
+              con.query("UPDATE users SET coins = ? WHERE steamid = ?; UPDATE withdraws SET state = ? WHERE tradeid = ?",
+                [result[0].value + result2[0].coins, offer.partner, offer.state, offer.id], (err, result) => {
+                if (err) {
+                  log("ERROR", err);
+                } else {
+                  log("INFO", "Returned coins to user from offer: " + offer.id)
+                }
               });
             }
           });
         }
       });
-    }
-  });
-});
-
-
-manager.on('sentOfferCancrled', function(offer, reason) {
-  for (var i in activeOffers) {
-    if (activeOffers[i].id === offer.id) {
-      activeOffers.splicr(i, 1);
       break;
-    } else {
-      continue;
-    }
   }
-  con.query("SELECT value FROM withdraws WHERE tradeid = '" + offer.id + "'", function(err, result, fields) {
-    if (err) log(err);
-    else {
-      con.query("SELECT coins FROM users WHERE steamid = " + offer.partner, function(err2, result2, fields2) {
-        con.query("UPDATE users SET coins = " + result[0].coins + result2[0].coins + " WHERE steamid = " + offer.partner, function(err, result) {
-          if (err) log(err);
-          else log("offer: " + offer.id + " cancrled, returned coins to user");
-          con.query("UPDATE withdraws SET state = 'cancrled' WHERE tradeid = " + offer.id, function(err, result) {
-            if(err) log(err);
-          });
-        });
-      });
-    }
-  });
 });
 
-function log(text) {
-  fs.appendFile('log.txt', Date.now() + text);
-}
-
-function log(file, message, code, errlevel = "info", arg1 = "nope", arg2 = "nope", arg3 = "nope") {
-  var toLog = {
-    "time": Date.now(),
-    "errlevel": errlevel,
-    "code": code,
-    "message": message,
-    "arg1": arg1,
-    "arg2": arg2,
-    "arg3": arg3
-  };
-  fs.appendFile(file, JSON.stringify(toLog));
-}
-
-function reAuth() {
-  client.logOff();
-  client.logOn({
-    "accountName": config.bot.name,
-    "password": config.bot.password,
-    "twoFactorCode": SteamTotp.generateAuthCode(config.bot.shared_secret)
-  });
-  client.webLogOn();
-}
-
-function mobileConfirm(){
-  steamConfirmations.fetchConfirmations(function(err, confirmations){
-    if (err){
-      log(err);
-      return;
-    }
-    if (!confirmations.length){
-      return;
-    }
-    for (var i in confirmations) {
-      steamConfirmations.accrptConfirmation(confirmations[i], function(err, result) {
-        if (err) {
-          log(err);
-          return;
-        }
-        log("Mobile Confirmation: " + result);
-      });
-    }
-  });
-}
-
-function updatePricr(fr) {
-  request('http://api.csgofast.com/pricr/all', {json:true}, function(err, res, body) {
-    if (err) {
-      log(err);
-      return;
-    }
-    pricrs = body;
-  });
-}
-
-function getPricr(item) {
-  return pricrs[item.market_hash_name];
-}
-
-function sendoffer(json) {
-  var json = JSON.parse(json);
-  var cr = null; //Callback error
-  var value = 0;
-  if (json.token !== config.token) return "0x01";
-
-  const offer = this.manager.createOffer(json.partner);
-  manager.getInventoryContents(730, 2, false, function(err, items, currencies) {
-    if (err) {
-      reAuth();
-      cr = "0x04";
-      return;
-    }
-    for (var i = 0; i < json.items.length; i++) {
-      var item = inv.find(item => item.assetid === json.items[i].assetid);
-      if (item) {
-        value += getPrice(item.market_hash_name);
-        offer.addMyItem(item);
-      } else {
-        cr = "0x02";
-        return;
-      }
-    }
-
-    con.query("SELECT coins FROM users WHERE steamid = " + offer.partner + "AND coins >= " + value * 100000, function(err, result, fields) {
-      if (err) {
-        cr = 0x06;
-        return;
-      }
-      if (result.length === 1) {
-        offer.send(function(err, status) {
-          if (err) {
-            cr = "0x05";
-            return;
-          }
-          mobileConfirm();
-          if (offer.status == "11") {
-            offer.cancrl(function() {
-              log(err);
-            });
-            cr = "0x08";
-          }
-          if (cr != null) return;
-          con.query("INSERT INTO withdraws (staemid, tradeid, coins, state) VALUES (" + offer.partner + ',' + offer.id + ',' + value * 100000 + ", 'pending')", function(err, result) {
-            if (err) {
-              cr = "0x06";
-              return;
-            } else {
-              log("offer sent: "+offer.id);
-            }
-          });
-          if (cr != null) return;
-          con.query("UPDATE users SET coins = " + result[0].coins - value * 100000 + "WHERE steamid = " + offer.partner, function(err, result) {
-            if (err) {
-              cr = "0x06";
-              return;
-            } else {
-              log("Updated user: " + offer.partner + " Coins");
-            }
-          });
-          if (cr != null) return;
-          else {
-            cr = "0x00";
-            activeOffers.push(offer);
-          }
-        });
-      } else {
-        cr = 0x03;
-      }
-    });
-  });
-  return cr;
+function log(level, message) {
+  fs.appendFile('log.txt', Date.now() + " | " + level + " | " + message + "\n");
 }
 
 function getItemsInTrade() {
@@ -298,19 +147,119 @@ function getBotsAccountsIds() {
   return client.steamID.getSteamID64();
 }
 
-app.post('/withdraw', function(req, res) {
-  res.send(sendoffer(req.body));
+function getPrice(item) {
+  return prices[item.market_hash_name];
+}
+
+function updatePrice(fr) {
+  request("http://api.csgofast.com/price/all", (err, res, body) => {
+    if (err) {
+      log("ERROR", err);
+    } else {
+      prices = JSON.parse(body);
+    }
+  });
+}
+
+app.post("/withdraw", (req, res) => {
+  var json = JSON.parse(req.body);
+  var cr = null;
+  var value = 0;
+  if (json.token !== config.token) return "0x01";
+  
+  const offer = manager.createOffer(json.partner);
+  manager.getInventoryContents(730, 2, false, (err, items, currencies) => { //Fetch all items that are in bot's inventory
+    if (err) {
+      client.relog();
+      cr = 0x04;
+      return;
+    }
+
+    for (var i in json.items) { //Add requested items
+      var item = items.find((element) => element.assetid == json.items[i].assetid);
+      if (item) {
+        value += getPrice(item.market_hash_name);
+        offer.addMyItem(item);
+      } else {
+        cr = 0x02;
+        break;
+      }
+    }
+
+    if (cr != null) return;
+
+    con.query("SELECT coins FROM users WHERE steamid = ? AND coins >= ?", [offer.partner, value * config.valueMultiplier], (err, result, fields) => {
+      if (err) {
+        log("ERROR", err);
+        cr = 0x06;
+        return;
+      }
+      if (result.length === 1) {
+        con.query("INSERT INTO withdraws (steamid, tradeid, coins, state) VALUES ?; UPDATE users SET coins = ? WHERE steamid = ?", 
+          [[offer.partner.getSteamID64(), offer.id, value * config.valueMultiplier, offer.state], result[0].coins - value * config.valueMultiplier, 
+          offer.partner.getSteamID64()], (err, result2) => {
+          if (err) {
+            log("ERROR", err);
+            cr = 0x06;
+            return;
+          } else {
+            log("INFO", "Offer: " + offer.id + " sent");
+            log("INFO", "User: " + offer.partner.getSteamID64() + " updated coins" + result[0].coins + " - " + value * config.valueMultiplier);
+          }
+        });
+        if (cr != null) return;
+
+        offer.send((err, status) => {
+          if (err) {
+            cr = 0x08;
+            return;
+          }
+          log("INFO", "Offer: " + offer.id + " sent");
+          if (status == "pending") { //Confirm a trade if it's required
+            community.getConfirmations(SteamTotp.time(), SteamTotp.getConfirmationKey(config.bot.identity_secret, SteamTotp.time(), "allow"), (err, confirmations) => { //Fetch all current confirmations
+              for (var i in confirmations) {
+                if (confirmations[i].type == 2 && confirmations[i].creator == offer.id) {
+                  confirmations[i].respond(SteamTotp.time(), SteamTotp.getConfirmationKey(config.bot.identity_secret, SteamTotp.time(), "allow"), true, (err) => {
+                    if (err) {
+                      log("ERROR", err);
+                      cr = 0x09;
+                    }
+                  });
+                }
+              }
+            });
+          }
+        });
+        if (cr != null) return;
+
+        if (offer.status == 11) { //Cancel a trade if it's in escrow
+          offer.cancel((err) => {
+            if (err) {
+              log("ERROR", err);
+            } else {
+              log("INFO", "Offer: " + offer.id + " canceled because it was in escrow");              
+              cr = 0x08;
+              return;
+            }
+          });
+        }
+        if (cr != null) return;
+        cr = 0x00
+        activeOffers.push(offer);
+      } else {
+        cr = 0x03;
+      }
+    });
+  });
+  res.send(cr);
 });
 
-app.get('/getItemsInTrade', function(req, res) {
+app.get("/getItemsInTrade", (req, res) => {
   res.send(getItemsInTrade());
 });
 
-app.get('/getBotsAccountsIds', function(req, res) {
+app.get("/getBotsAccountsIds", (req, res) => {
   res.send(getBotsAccountsIds());
 });
 
-updatePricr();
-setInterval(updatePricr, 600000);
-
-app.listen(31337);
+app.listen(config.port);

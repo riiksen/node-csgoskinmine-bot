@@ -1,9 +1,10 @@
 module.exports = {
   token: '', //Token to authenticate withdraw request's
+  port: 3115, //Port on which it will listen for requests
   apiKey: '', //Steam api key
   doamin: 'csgoskinmine.com', //Your domain
-  cancelTime: '600000', //Time after which offer will be automaticly canceld, default: 10 minutes
-  valueMultiplier: '100000', // Not in use yet
+  cancelTime: 600000, //Time after which offer will be automaticly canceld, default: 10 minutes
+  valueMultiplier: 1000, // 
 
   bot: {
     name: '', //Steam account name
@@ -14,9 +15,10 @@ module.exports = {
   
   mysql: {
     host: "localhost",
-    user: "",
-    password: "",
-    database: ""
+    user: "bot",
+    password: "test",
+    database: "csgoskinmine",
+    multipleStatements: true
   },
 
   //Not in use yet

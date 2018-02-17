@@ -1,0 +1,8 @@
+{
+  "token" : "", // Token to prevent from ssrf attack and others
+  "partner": "", //Trade link with partner and token parameters
+  "items": [ //Asset ids of items
+    {"assetid": "196843133"},
+    {"assetid": 4984894894}
+  ]
+}
