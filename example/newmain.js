@@ -28,7 +28,7 @@ $(document).ready(function() {
   //
   for (var i in v0["assets"]) {
     if (v0["assets"][i]["instanceid"] == "0") {
-      for (var n in v0["rgInventory"]) {
+      for (var n in v0["assets"]) {
         if (n == i) {
           continue;
         } else {
