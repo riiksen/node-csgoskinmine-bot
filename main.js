@@ -2,14 +2,13 @@
 const config = require("./config.js");
 const SteamUser = require("steam-user");
 const TradeOfferManager = require("steam-tradeoffer-manager");
-//const SteamCommunity = require("steamcommunity");
+const SteamCommunity = require("steamcommunity");
 const SteamTotp = require("steam-totp");
-const SteamMobileConfirmations = require("steam-mobile-confirmations");
+//const SteamMobileConfirmations = require("steam-mobile-confirmations");
 const mysql = require("mysql");
 const express = require("express");
 const request = require("request");
 const fs = require("fs");
-const os = require("os");
 const bodyParser = require("body-parser");
 
 const app = express();
@@ -18,7 +17,7 @@ const client = new SteamUser();
 const community = new SteamCommunity();
 const manager = new TradeOfferManager({
   steam: client,
-  //community: community,
+  community: community,
   //"domain": config.domain,
   language: "en",
   cancelTime: config.cancelTime
@@ -52,12 +51,12 @@ client.on("loggedOn", () => {
 
 client.on("webSession", (sessionid, cookies) => {
   manager.setCookies(cookies);
-  //community.setCookies(cookies);
-  steamConfirmations = new SteamMobileConfirmations({
-    steamId: client.steamID.getSteamID64(),
-    identitySecret: config.bot.identity_secret,
-    webCookie: cookies
-  });
+  community.setCookies(cookies);
+  //steamConfirmations = new SteamMobileConfirmations({
+  //  steamId: client.steamID.getSteamID64(),
+  //  identitySecret: config.bot.identity_secret,
+  //  webCookie: cookies
+  //});
 });
 
 //manager.apiKey = config.apiKey;

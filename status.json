@@ -10,5 +10,5 @@
   "0x07": "Requested item is already in trade",
   "0x08": "Offer is in escrow",
   "0x09": "Encounted error when responding to the confirmation",
-  
+  "0x0a": "Could not find price of the requested item"
 }
