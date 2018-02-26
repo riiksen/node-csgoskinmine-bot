@@ -2,13 +2,15 @@
 const config = require("./config.js");
 const SteamUser = require("steam-user");
 const TradeOfferManager = require("steam-tradeoffer-manager");
-const SteamCommunity = require("steamcommunity");
+//const SteamCommunity = require("steamcommunity");
 const SteamTotp = require("steam-totp");
-//const SteamMobileConfirmations = require("steam-mobile-confirmations");
+const SteamMobileConfirmations = require("steam-mobile-confirmations");
 const mysql = require("mysql");
 const express = require("express");
 const request = require("request");
 const fs = require("fs");
+const os = require("os");
+const bodyParser = require("body-parser");
 
 const app = express();
 const con = mysql.createConnection(config.mysql);
@@ -16,15 +18,19 @@ const client = new SteamUser();
 const community = new SteamCommunity();
 const manager = new TradeOfferManager({
   steam: client,
-  community: community,
+  //community: community,
   //"domain": config.domain,
   language: "en",
   cancelTime: config.cancelTime
 });
 
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
 var prices = null;
 var activeOffers = [];
 var bots = [];
+var steamConfirmations = null;
 
 con.connect((err) => {
   if (err) {
@@ -34,7 +40,7 @@ con.connect((err) => {
 
 client.logOn({
   accountName: config.bot.name,
-  password: config.password,
+  password: config.bot.password,
   twoFactorCode: SteamTotp.generateAuthCode(config.bot.shared_secret),
   rememberPassword: true
 });
@@ -46,7 +52,12 @@ client.on("loggedOn", () => {
 
 client.on("webSession", (sessionid, cookies) => {
   manager.setCookies(cookies);
-  community.setCookies(cookies);
+  //community.setCookies(cookies);
+  steamConfirmations = new SteamMobileConfirmations({
+    steamId: client.steamID.getSteamID64(),
+    identitySecret: config.bot.identity_secret,
+    webCookie: cookies
+  });
 });
 
 //manager.apiKey = config.apiKey;
@@ -114,7 +125,7 @@ manager.on("sentOfferChanged", (offer, oldState) => {
               log("ERROR", err);
             } else {
               con.query("UPDATE users SET coins = ? WHERE steamid = ?; UPDATE withdraws SET state = ? WHERE tradeid = ?",
-                [result[0].value + result2[0].coins, offer.partner, offer.state, offer.id], (err, result) => {
+                [result[0].value + result2[0].coins, offer.partner.getSteamID64(), offer.state, offer.id], (err, result) => {
                 if (err) {
                   log("ERROR", err);
                 } else {
@@ -157,17 +168,22 @@ function updatePrice(fr) {
       log("ERROR", err);
     } else {
       prices = JSON.parse(body);
+      fs.writeFile("prices.json", body, (err) => {
+        if (err) {
+          log("ERROR", err);
+        }
+      });
     }
   });
 }
 
 app.post("/withdraw", (req, res) => {
-  var json = JSON.parse(req.body);
+  var json = req.body;
   var cr = null;
-  var value = 0;
-  if (json.token !== config.token) return "0x01";
+  var value = 0.0;
+  //if (json["token"] !== config.token) return "0x01";
   
-  const offer = manager.createOffer(json.partner);
+  const offer = manager.createOffer(json["partner"]);
   manager.getInventoryContents(730, 2, false, (err, items, currencies) => { //Fetch all items that are in bot's inventory
     if (err) {
       client.relog();
@@ -175,10 +191,14 @@ app.post("/withdraw", (req, res) => {
       return;
     }
 
-    for (var i in json.items) { //Add requested items
-      var item = items.find((element) => element.assetid == json.items[i].assetid);
+    for (var i in json["items"]) { //Add requested items
+      var item = items.find((element) => element.assetid == json["items"][i]["assetid"]);
       if (item) {
         value += getPrice(item.market_hash_name);
+        if (value == undefined) {
+          cr = 0x0a;
+          break;
+        }
         offer.addMyItem(item);
       } else {
         cr = 0x02;
@@ -188,7 +208,9 @@ app.post("/withdraw", (req, res) => {
 
     if (cr != null) return;
 
-    con.query("SELECT coins FROM users WHERE steamid = ? AND coins >= ?", [offer.partner, value * config.valueMultiplier], (err, result, fields) => {
+    offer.setMessage("Withdraw from csgoskinmine.com. After this trade your balance on site will be reduced by " + value * config.valueMultiplier + " credits.");
+
+    con.query("SELECT coins FROM users WHERE steamid = ? AND coins >= ?", [offer.partner.getSteamID64(), value * config.valueMultiplier], (err, result, fields) => {
       if (err) {
         log("ERROR", err);
         cr = 0x06;
@@ -216,16 +238,10 @@ app.post("/withdraw", (req, res) => {
           }
           log("INFO", "Offer: " + offer.id + " sent");
           if (status == "pending") { //Confirm a trade if it's required
-            community.getConfirmations(SteamTotp.time(), SteamTotp.getConfirmationKey(config.bot.identity_secret, SteamTotp.time(), "allow"), (err, confirmations) => { //Fetch all current confirmations
-              for (var i in confirmations) {
-                if (confirmations[i].type == 2 && confirmations[i].creator == offer.id) {
-                  confirmations[i].respond(SteamTotp.time(), SteamTotp.getConfirmationKey(config.bot.identity_secret, SteamTotp.time(), "allow"), true, (err) => {
-                    if (err) {
-                      log("ERROR", err);
-                      cr = 0x09;
-                    }
-                  });
-                }
+            acceptConfirmationForObject(config.bot.identity_secret, offer.id, (err) => {
+              if (err) {
+                log("ERROR", err);
+                cr = 0x09;
               }
             });
           }
@@ -261,5 +277,8 @@ app.get("/getItemsInTrade", (req, res) => {
 app.get("/getBotsAccountsIds", (req, res) => {
   res.send(getBotsAccountsIds());
 });
+
+updatePrice();
+setInterval(updatePrice, 600000);
 
 app.listen(config.port);
