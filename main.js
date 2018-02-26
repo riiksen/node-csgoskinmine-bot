@@ -186,7 +186,7 @@ app.post("/withdraw", (req, res) => {
   manager.getInventoryContents(730, 2, false, (err, items, currencies) => { //Fetch all items that are in bot's inventory
     if (err) {
       client.relog();
-      cr = 0x04;
+      cr = "0x04";
       return;
     }
 
@@ -195,12 +195,12 @@ app.post("/withdraw", (req, res) => {
       if (item) {
         value += getPrice(item.market_hash_name);
         if (value == undefined) {
-          cr = 0x0a;
+          cr = "0x0a";
           break;
         }
         offer.addMyItem(item);
       } else {
-        cr = 0x02;
+        cr = "0x02";
         break;
       }
     }
@@ -212,7 +212,7 @@ app.post("/withdraw", (req, res) => {
     con.query("SELECT coins FROM users WHERE steamid = ? AND coins >= ?", [offer.partner.getSteamID64(), value * config.valueMultiplier], (err, result, fields) => {
       if (err) {
         log("ERROR", err);
-        cr = 0x06;
+        cr = "0x06";
         return;
       }
       if (result.length === 1) {
@@ -221,7 +221,7 @@ app.post("/withdraw", (req, res) => {
           offer.partner.getSteamID64()], (err, result2) => {
           if (err) {
             log("ERROR", err);
-            cr = 0x06;
+            cr = "0x06";
             return;
           } else {
             log("INFO", "Offer: " + offer.id + " sent");
@@ -232,7 +232,7 @@ app.post("/withdraw", (req, res) => {
 
         offer.send((err, status) => {
           if (err) {
-            cr = 0x08;
+            cr = "0x08";
             return;
           }
           log("INFO", "Offer: " + offer.id + " sent");
@@ -240,7 +240,7 @@ app.post("/withdraw", (req, res) => {
             acceptConfirmationForObject(config.bot.identity_secret, offer.id, (err) => {
               if (err) {
                 log("ERROR", err);
-                cr = 0x09;
+                cr = "0x09";
               }
             });
           }
@@ -253,16 +253,16 @@ app.post("/withdraw", (req, res) => {
               log("ERROR", err);
             } else {
               log("INFO", "Offer: " + offer.id + " canceled because it was in escrow");              
-              cr = 0x08;
+              cr = "0x08";
               return;
             }
           });
         }
         if (cr != null) return;
-        cr = 0x00
+        cr = "0x00";
         activeOffers.push(offer);
       } else {
-        cr = 0x03;
+        cr = "0x03";
       }
     });
   });
