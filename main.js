@@ -29,7 +29,6 @@ app.use(bodyParser.json());
 var prices = null;
 var activeOffers = [];
 var bots = [];
-var steamConfirmations = null;
 
 con.connect((err) => {
   if (err) {
