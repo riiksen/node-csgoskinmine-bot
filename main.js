@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 const config = require("./config.js");
 const SteamUser = require("steam-user");
 const TradeOfferManager = require("steam-tradeoffer-manager");
